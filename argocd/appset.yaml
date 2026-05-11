@@ -6,7 +6,7 @@ metadata:
 spec:
   generators:
   - git:
-      repoURL: https://github.com/akuity/kargo-helm.git
+      repoURL: https://github.com/tomershafir-hub/kargo-helm.git
       revision: HEAD
       directories:
       - path: env/*
@@ -18,12 +18,15 @@ spec:
     spec:
       destination:
         namespace: kargo-helm-{{path.basename}}
-        name: demo
+        server: https://kubernetes.default.svc
       project: kargo-helm
       source:
         path: charts/guestbook
-        repoURL: https://github.com/akuity/kargo-helm.git
+        repoURL: https://github.com/tomershafir-hub/kargo-helm.git
         helm:
           valueFiles:
           - "/env/{{path.basename}}/values.yaml"
           - "/env/{{path.basename}}/feature-flags.yaml"
+          parameters:
+          - name: image.tag
+            value: latest

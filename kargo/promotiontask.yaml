@@ -6,9 +6,9 @@ metadata:
 spec:
   vars:
   - name: image
-    value: ghcr.io/akuity/guestbook
+    value: ghcr.io/tomershafir-hub/guestbook
   - name: repoURL
-    value: https://github.com/akuity/kargo-helm.git
+    value: https://github.com/tomershafir-hub/kargo-helm.git
   - name: branch
     value: main
 

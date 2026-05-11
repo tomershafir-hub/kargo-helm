@@ -15,4 +15,4 @@ spec:
   - group: '*'
     kind: '*'
   sourceRepos:
-  - https://github.com/akuity/kargo-helm.git
+  - https://github.com/tomershafir-hub/kargo-helm.git

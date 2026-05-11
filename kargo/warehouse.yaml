@@ -6,9 +6,8 @@ metadata:
 spec:
   subscriptions:
   - image:
-      repoURL: ghcr.io/akuity/guestbook
+      repoURL: ghcr.io/tomershafir-hub/guestbook
       imageSelectionStrategy: SemVer
-
 ---
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Warehouse
@@ -21,6 +20,6 @@ spec:
       branch: main
       commitSelectionStrategy: NewestFromBranch
       discoveryLimit: 20
-      repoURL: https://github.com/akuity/kargo-helm.git
+      repoURL: https://github.com/tomershafir-hub/kargo-helm.git
       includePaths:
       - base/feature-flags.yaml
