@@ -1,5 +1,5 @@
 image:
-  repository: docker.io/library/nginx
+  repository: nginx
   pullPolicy: IfNotPresent
   tag: latest
 

@@ -6,7 +6,7 @@ metadata:
 spec:
   vars:
   - name: image
-    value: docker.io/library/nginx
+    value: nginx
   - name: repoURL
     value: https://github.com/tomershafir-hub/kargo-helm.git
   - name: branch
@@ -43,11 +43,12 @@ spec:
     as: commit
     config:
       path: ./out
-      message: "${{
-        ctx.targetFreight.origin.name == 'guestbook' ? 
+      message: >-
+        ${{
+        ctx.targetFreight.origin.name == 'guestbook' ?
         'updated '+ctx.stage+' guestbook to '+imageFrom( vars.image, warehouse("guestbook") ).Tag :
         'updates '+ctx.stage+' features.yaml from '+commitFrom( vars.repoURL, warehouse("features") ).ID
-        }}"
+        }}
   - uses: git-push
     config:
       path: ./out
