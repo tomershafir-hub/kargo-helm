@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/tomershafir-hub/guestbook
+  repository: docker.io/library/nginx
   pullPolicy: IfNotPresent
   tag: latest
 

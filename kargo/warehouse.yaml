@@ -6,8 +6,9 @@ metadata:
 spec:
   subscriptions:
   - image:
-      repoURL: ghcr.io/tomershafir-hub/guestbook
+      repoURL: docker.io/library/nginx
       imageSelectionStrategy: SemVer
+      semverConstraint: ^1.27
 ---
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Warehouse

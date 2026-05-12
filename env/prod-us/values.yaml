@@ -1,4 +1,4 @@
 image:
-  tag: v0.0.88
+  tag: 1.27.0
 
 replicaCount: 2
