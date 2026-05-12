@@ -56,3 +56,33 @@ spec:
     config:
       apps:
       - name: kargo-helm-${{ ctx.stage }}
+
+---
+# Tags the repo with v<image-tag> when a Freight reaches the `release` stage.
+# `release` is downstream of all three prods. Kargo only promotes a given
+# Freight to a given Stage once, so the tag is pushed exactly once even if
+# the Freight is already deployed to multiple prods.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: PromotionTask
+metadata:
+  name: tag-release
+  namespace: kargo-helm
+spec:
+  vars:
+  - name: image
+    value: nginx
+  - name: repoURL
+    value: https://github.com/tomershafir-hub/kargo-helm.git
+  - name: branch
+    value: main
+  steps:
+  - uses: git-clone
+    config:
+      repoURL: ${{ vars.repoURL }}
+      checkout:
+      - branch: ${{ vars.branch }}
+        path: ./out
+  - uses: git-push
+    config:
+      path: ./out
+      tag: v${{ imageFrom( vars.image, warehouse("guestbook") ).Tag }}

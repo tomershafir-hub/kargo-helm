@@ -10,7 +10,7 @@ the public Docker Hub `nginx` image so it works without a custom registry.
 ## What this example demonstrates
 
 A GitOps pipeline that promotes **two independent streams** of change
-through four environments (`dev` → `staging` → `prod-us` / `prod-eu`):
+through five Stages (`dev` → `staging` → `prod` / `prod-italy` / `prod-australia` → `release`):
 
 1. **An image stream** — Kargo watches a container registry. When a new
    semver-tagged image appears, Kargo creates a `Freight` for it. Promoting
@@ -73,21 +73,24 @@ Two warehouses here:
 
 ### `kargo/stages.yaml`
 
-Defines the four **Stages**: `dev`, `staging`, `prod-us`, `prod-eu`. A Stage
-is a *target* for promotion. Each Stage declares:
+Defines six **Stages**: `dev`, `staging`, `prod`, `prod-italy`,
+`prod-australia`, and `release`. A Stage is a *target* for promotion. Each
+declares:
 
 - **`requestedFreight`** — which warehouses it consumes, and where that
   Freight is allowed to come from. `dev` accepts Freight `direct` from each
   warehouse (i.e. fresh from the source). Downstream stages only accept
   Freight that has already been promoted to an upstream Stage:
   - `staging` ← from `dev`
-  - `prod-us` ← from `staging`
-  - `prod-eu` ← from `staging`
+  - `prod` / `prod-italy` / `prod-australia` ← from `staging` (each one fan-outs from staging)
+  - `release` ← from any of the three prods (OR semantics: as soon as one prod accepts the Freight, it becomes eligible for `release`)
 
   This is what enforces "code must pass through dev before it can reach prod."
 
-- **`promotionTemplate`** — how to actually perform the promotion. All four
-  Stages reference the same shared `PromotionTask` named `promote` (see below).
+- **`promotionTemplate`** — how to actually perform the promotion. The four
+  deploy Stages (`dev`, `staging`, and the three prods) share the
+  `promote` PromotionTask. The `release` Stage uses its own `tag-release`
+  PromotionTask, which only pushes a git tag — no deployment.
 
 - **annotations** — `kargo.akuity.io/argocd-context` tells the Kargo UI which
   Argo CD `Application` corresponds to this Stage so the UI can show sync
@@ -154,12 +157,12 @@ Each Stage has its own values file that overrides the chart defaults:
 ```yaml
 image:
   tag: 1.27.0       # ← updated by the PromotionTask's yaml-update step
-replicaCount: 1     # 2 in prod-us and prod-eu
+replicaCount: 1     # 2 in prod, prod-italy, prod-australia
 ```
 
 Plus a `feature-flags.yaml` (copied in by the PromotionTask).
 
-`prod-us` and `prod-eu` have `replicaCount: 2` to demonstrate that per-env
+`prod`, `prod-italy`, and `prod-australia` have `replicaCount: 2` to demonstrate that per-env
 differences live here, not in the chart or in Kargo.
 
 ---
@@ -207,6 +210,48 @@ Feature-flag promotion follows the same flow, but it's the `git-clone`
 
 ---
 
+## The `release` Stage — tagging on prod
+
+A dedicated tag-only Stage sits downstream of all three prods. It deploys
+nothing — its sole job is to push a git tag of the form `v<image-tag>` (e.g.
+`v1.27.5`) so each released image version is locatable in Git history.
+
+### How it works
+
+- `release.spec.requestedFreight.sources.stages` lists all three prods (OR
+  semantics). The Freight becomes eligible for `release` as soon as any one
+  prod accepts it.
+- `release.spec.promotionTemplate` invokes the `tag-release` PromotionTask
+  (separate from the deploy task). That task clones the repo and runs a
+  `git-push` with a `tag:` config.
+- Kargo only ever promotes a given Freight to a given Stage **once**. So
+  even if you (or auto-promotion) try to promote from all three prods, the
+  tag is pushed exactly once.
+- Currently set to **manual** promotion — click "Promote to release" in the
+  UI on the Freight once it's in production. To make it automatic, add a
+  Project-level `promotionPolicies` entry:
+
+  ```yaml
+  apiVersion: kargo.akuity.io/v1alpha1
+  kind: Project
+  metadata:
+    name: kargo-helm
+  spec:
+    promotionPolicies:
+    - stage: release
+      autoPromotionEnabled: true
+  ```
+
+### What gets tagged
+
+The tag points at `HEAD` of `main` at the time the PromotionTask runs — i.e.
+the latest commit Kargo made for that Freight's deployments. If you need
+the tag to point at a specific env's promotion commit instead, the
+`git-clone` step would need a `commit:` field referencing the Freight's
+verified commit, then `git-push` from there.
+
+---
+
 ## Common pitfalls
 
 - **`reflect.Value.Field on zero Value` on `imageFrom(...).Tag`** — the
@@ -227,6 +272,26 @@ Feature-flag promotion follows the same flow, but it's the `git-clone`
 - **Outer double-quoted YAML strings containing `warehouse("...")` calls** —
   the inner `"` closes the outer string. Use a folded scalar (`>-`) or
   escape the inner quotes.
+
+- **`git-push` step fails with `could not read Username for 'https://github.com'`** —
+  Kargo has no Git credentials registered for the project, so `git push`
+  falls through to an interactive prompt. The most portable fix (works
+  across Kargo CLI versions, which keep changing flag names) is to create
+  a labeled Kubernetes Secret in the project namespace:
+
+  ```shell
+  kubectl create secret generic github-creds -n kargo-helm \
+    --from-literal=repoURL=https://github.com/<user>/kargo-helm.git \
+    --from-literal=username=<user> \
+    --from-literal=password=<github-PAT>
+  kubectl label secret github-creds -n kargo-helm kargo.akuity.io/cred-type=git
+  ```
+
+  The PAT needs `Contents: read+write` on the repo. Credentials are
+  matched to the PromotionTask's `repoURL` by prefix, so the strings
+  must agree. The `kargo create credentials` CLI does the same thing
+  under the hood but its flag layout differs between versions
+  (`--project` vs `-p` vs positional) — check `kargo create credentials --help`.
 
 - **Argo CD Application not syncing after promotion** — verify the
   `argocd-update` step targets the right Application name (must be

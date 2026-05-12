@@ -52,21 +52,16 @@ spec:
       steps:
       - task:
           name: promote
-  promotionTemplate:
-    spec:
-      steps:
-      - task:
-          name: promote
 
 ---
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
-  name: prod-us
+  name: prod
   namespace: kargo-helm
   annotations:
     kargo.akuity.io/color: red
-    kargo.akuity.io/argocd-context: '[{"name":"kargo-helm-prod-us","namespace":"argocd"}]'
+    kargo.akuity.io/argocd-context: '[{"name":"kargo-helm-prod","namespace":"argocd"}]'
 spec:
   requestedFreight:
   - origin:
@@ -91,11 +86,11 @@ spec:
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
-  name: prod-eu
+  name: prod-italy
   namespace: kargo-helm
   annotations:
     kargo.akuity.io/color: red
-    kargo.akuity.io/argocd-context: '[{"name":"kargo-helm-prod-eu","namespace":"argocd"}]'
+    kargo.akuity.io/argocd-context: '[{"name":"kargo-helm-prod-italy","namespace":"argocd"}]'
 spec:
   requestedFreight:
   - origin:
@@ -115,3 +110,60 @@ spec:
       steps:
       - task:
           name: promote
+
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prod-australia
+  namespace: kargo-helm
+  annotations:
+    kargo.akuity.io/color: red
+    kargo.akuity.io/argocd-context: '[{"name":"kargo-helm-prod-australia","namespace":"argocd"}]'
+spec:
+  requestedFreight:
+  - origin:
+      kind: Warehouse
+      name: guestbook
+    sources:
+      stages:
+        - staging
+  - origin:
+      kind: Warehouse
+      name: features
+    sources:
+      stages:
+        - staging
+  promotionTemplate:
+    spec:
+      steps:
+      - task:
+          name: promote
+
+---
+# Tag-only stage: no deployment, just pushes a git tag named v<image-tag>.
+# Downstream of all three prods; the first prod to accept the Freight unlocks
+# eligibility, and Kargo's per-Stage promotion idempotency guarantees the tag
+# is pushed exactly once even if you click Promote from multiple prods.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: release
+  namespace: kargo-helm
+  annotations:
+    kargo.akuity.io/color: purple
+spec:
+  requestedFreight:
+  - origin:
+      kind: Warehouse
+      name: guestbook
+    sources:
+      stages:
+        - prod
+        - prod-italy
+        - prod-australia
+  promotionTemplate:
+    spec:
+      steps:
+      - task:
+          name: tag-release
